@@ -177,3 +177,17 @@ if all_expenses:
             st.success(f"Udgift {option} er slettet ✅")
 else:
     st.write("Ingen udgifter at slette endnu.")
+
+# --- RESET APP (kun administrator) ---
+st.markdown("---")
+st.subheader("⚠️ Administrator: Nulstil app")
+st.markdown(
+    "Denne funktion sletter **alle udgifter og brugere**. Brug kun hvis du er administrator!"
+)
+if st.button("NULSTIL APP"):
+    conn = sqlite3.connect("expenses.db")
+    c = conn.cursor()
+    c.execute("DELETE FROM expenses")
+    conn.commit()
+    conn.close()
+    st.success("Appen er nulstillet ✅ Alle udgifter og brugere er slettet.")
