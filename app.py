@@ -6,14 +6,19 @@ import hashlib
 def init_db():
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
+    # Opret tabel, hvis den ikke findes
     c.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user TEXT,
-            amount REAL,
-            payers TEXT
+            amount REAL
         )
     """)
+    # Tilføj kolonnen 'payers', hvis den ikke findes
+    c.execute("PRAGMA table_info(expenses)")
+    columns = [info[1] for info in c.fetchall()]
+    if 'payers' not in columns:
+        c.execute("ALTER TABLE expenses ADD COLUMN payers TEXT")
     conn.commit()
     conn.close()
 
