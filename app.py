@@ -36,6 +36,20 @@ def get_expenses():
         expenses[user].append(amount)
     return expenses
 
+def get_all_expenses():
+    conn = sqlite3.connect("expenses.db")
+    c = conn.cursor()
+    c.execute("SELECT id, user, amount FROM expenses ORDER BY id DESC")
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def delete_expense(expense_id):
+    conn = sqlite3.connect("expenses.db")
+    c = conn.cursor()
+    c.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+    conn.commit()
+    conn.close()
 
 # --- Beregning ---
 def settle_expenses(expenses):
@@ -76,6 +90,7 @@ st.title("💶 Berlin Tur - Regnskabsapp")
 
 init_db()
 
+# --- Tilføj udgift ---
 st.subheader("Tilføj udgift")
 user = st.text_input("Navn")
 amount = st.number_input("Beløb (DKK)", min_value=0.0, step=0.01)
@@ -87,16 +102,15 @@ if st.button("Gem udgift"):
     else:
         st.error("Indtast navn og et beløb > 0")
 
-expenses = get_expenses()
-
 # --- Oversigt ---
+expenses = get_expenses()
 if expenses:
     st.subheader("Aktuelle udgifter")
     for u, amounts in expenses.items():
         st.write(f"**{u}**: {sum(amounts):.2f} kr. (udlæg: {amounts})")
 
 # --- Beregn afregning ---
-if st.button("Beregn afregning") and expenses:
+if expenses and st.button("Beregn afregning"):
     results = settle_expenses(expenses)
     st.subheader("Afregning")
     if results:
@@ -104,3 +118,20 @@ if st.button("Beregn afregning") and expenses:
             st.write(r)
     else:
         st.write("Alle har allerede betalt lige meget ✅")
+
+# --- Slet udgift ---
+st.subheader("Slet en udgift")
+all_expenses = get_all_expenses()
+if all_expenses:
+    option = st.selectbox(
+        "Vælg en udgift at slette",
+        [f"ID {exp_id} | {u} har lagt ud med {amt:.2f} kr." for exp_id, u, amt in all_expenses]
+    )
+
+    if option:
+        exp_id = int(option.split()[1])  # træk ID ud af teksten
+        if st.button("Slet valgt udgift"):
+            delete_expense(exp_id)
+            st.success(f"Udgift {option} er slettet ✅")
+else:
+    st.write("Ingen udgifter at slette endnu.")
