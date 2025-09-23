@@ -23,14 +23,16 @@ def init_db():
     # Tilføj kolonnen 'paid_by', hvis den ikke findes
     if 'paid_by' not in columns:
         c.execute("ALTER TABLE expenses ADD COLUMN paid_by TEXT")
-        # Sæt 'paid_by' = 'user' for eksisterende rækker
         c.execute("UPDATE expenses SET paid_by = user")
 
     # Tilføj kolonnen 'payers', hvis den ikke findes
     if 'payers' not in columns:
         c.execute("ALTER TABLE expenses ADD COLUMN payers TEXT")
-        # Sæt 'payers' = user for eksisterende rækker
         c.execute("UPDATE expenses SET payers = user")
+
+    # Tilføj kolonnen 'paid', hvis den ikke findes
+    if 'paid' not in columns:
+        c.execute("ALTER TABLE expenses ADD COLUMN paid INTEGER DEFAULT 0")  # 0=ikke betalt, 1=betalt
 
     conn.commit()
     conn.close()
@@ -39,27 +41,27 @@ def add_expense(paid_by, amount, payers):
     payers_str = ",".join(payers)
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
-    c.execute("INSERT INTO expenses (paid_by, amount, payers) VALUES (?, ?, ?)", (paid_by, amount, payers_str))
+    c.execute("INSERT INTO expenses (paid_by, amount, payers, paid) VALUES (?, ?, ?, 0)", (paid_by, amount, payers_str))
     conn.commit()
     conn.close()
 
 def get_expenses():
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
-    c.execute("SELECT paid_by, amount, payers FROM expenses")
+    c.execute("SELECT id, paid_by, amount, payers, paid FROM expenses")
     rows = c.fetchall()
     conn.close()
     expenses = {}
-    for paid_by, amount, payers in rows:
+    for exp_id, paid_by, amount, payers, paid in rows:
         if paid_by not in expenses:
             expenses[paid_by] = []
-        expenses[paid_by].append((amount, payers))
+        expenses[paid_by].append((exp_id, amount, payers, paid))
     return expenses
 
 def get_all_expenses():
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
-    c.execute("SELECT id, paid_by, amount, payers FROM expenses ORDER BY id DESC")
+    c.execute("SELECT id, paid_by, amount, payers, paid FROM expenses ORDER BY id DESC")
     rows = c.fetchall()
     conn.close()
     return rows
@@ -71,12 +73,19 @@ def delete_expense(expense_id):
     conn.commit()
     conn.close()
 
+def mark_as_paid(expense_id):
+    conn = sqlite3.connect("expenses.db")
+    c = conn.cursor()
+    c.execute("UPDATE expenses SET paid = 1 WHERE id = ?", (expense_id,))
+    conn.commit()
+    conn.close()
+
 # --- Beregning ---
 def settle_expenses(expenses):
     if not expenses:
         return []
 
-    totals = {person: sum([amt for amt, _ in vals]) for person, vals in expenses.items()}
+    totals = {person: sum([amt for _, amt, _, _ in vals]) for person, vals in expenses.items()}
     total_amount = sum(totals.values())
     num_people = len(expenses)
     fair_share = total_amount / num_people
@@ -100,7 +109,7 @@ def settle_expenses(expenses):
             j += 1
     return settlements
 
-# --- Funktion til at generere faste farver ud fra navn ---
+# --- Farvefunktion ---
 def get_color_from_name(name):
     hash_int = int(hashlib.md5(name.encode()).hexdigest(), 16)
     hue = hash_int % 360
@@ -110,7 +119,7 @@ def get_color_from_name(name):
 st.title("💶 Berlin Tur - Regnskabsapp")
 init_db()
 
-# --- Opret bruger automatisk ---
+# --- Opret bruger ---
 st.subheader("Tilføj bruger")
 user = st.text_input("Navn", key="user_input")
 if user:
@@ -119,7 +128,7 @@ if user:
         add_expense(user, 0.0, [user])
         st.info(f"{user} er oprettet med 0 kr.")
 
-# --- Tilføj udgift via form ---
+# --- Tilføj udgift ---
 st.subheader("Tilføj udgift")
 all_users = list(get_expenses().keys())
 if all_users:
@@ -137,20 +146,33 @@ if all_users:
             else:
                 st.error("Indtast beløb > 0 og vælg mindst én person")
 
-# --- Oversigt med badges ---
+# --- Oversigt med badges og betalt-status ---
 expenses = get_expenses()
 if expenses:
     st.subheader("Aktuelle udgifter")
     for paid_by, vals in expenses.items():
-        total = sum([amt for amt, _ in vals])
+        total = sum([amt for _, amt, _, _ in vals])
         st.write(f"**{paid_by} har lagt ud:** {total:.2f} kr.")
-        for amt, payers_str in vals:
+        for exp_id, amt, payers_str, paid in vals:
             payer_list = payers_str.split(",")
             badges_html = ""
             for payer in payer_list:
                 color = get_color_from_name(payer)
                 badges_html += f"<span style='background-color:{color}; color:black; padding:3px 6px; border-radius:5px; margin-right:3px;'>{payer}: {amt:.2f} kr.</span>"
-            st.markdown(badges_html, unsafe_allow_html=True)
+            status_text = "✅ Betalt" if paid else "❌ Ikke betalt"
+            status_color = "green" if paid else "red"
+            st.markdown(badges_html + f" <span style='color:{status_color}; font-weight:bold'>{status_text}</span>", unsafe_allow_html=True)
+
+# --- Marker som betalt ---
+st.subheader("Marker udgifter som betalt")
+all_expenses = get_all_expenses()
+if all_expenses:
+    for exp_id, paid_by, amount, payers, paid in all_expenses:
+        label = f"{paid_by} har lagt ud med {amount:.2f} kr. ({payers})"
+        if not paid:
+            if st.checkbox(f"Betalt? {label}", key=f"paid_{exp_id}"):
+                mark_as_paid(exp_id)
+                st.success(f"Udgiften ID {exp_id} er markeret som betalt ✅")
 
 # --- Beregn afregning ---
 if expenses and st.button("Beregn afregning"):
@@ -164,11 +186,10 @@ if expenses and st.button("Beregn afregning"):
 
 # --- Slet udgift ---
 st.subheader("Slet en udgift")
-all_expenses = get_all_expenses()
 if all_expenses:
     option = st.selectbox(
         "Vælg en udgift at slette",
-        [f"ID {exp_id} | {paid_by} har lagt ud med {amt:.2f} kr. ({payers})" for exp_id, paid_by, amt, payers in all_expenses]
+        [f"ID {exp_id} | {paid_by} har lagt ud med {amount:.2f} kr. ({payers})" for exp_id, paid_by, amount, payers, _ in all_expenses]
     )
     if option:
         exp_id = int(option.split()[1])
