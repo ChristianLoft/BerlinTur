@@ -231,3 +231,7 @@ if st.button("NULSTIL APP"):
     conn.commit()
     conn.close()
     st.success("Appen er nulstillet ✅ Alle udgifter og brugere er slettet.")
+
+
+
+st.subheader("COPYRIGHT CHRISTIAN LOFT CONSULTANCY AND BIG MONEY")
