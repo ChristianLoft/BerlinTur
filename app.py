@@ -197,15 +197,14 @@ if expenses and st.button("Beregn afregning"):
         status_text = "✅ Betalt" if paid else "❌ Ikke betalt"
         status_color = "green" if paid else "red"
 
-        # Checkbox for at markere som betalt
-        if not paid:
-            if st.checkbox(f"Betalt? {label}", key=f"settlement_{settlement_id}"):
-                mark_settlement_paid(settlement_id)
-                paid = 1
-                status_text = "✅ Betalt"
-                status_color = "green"
+        # Checkbox til at markere som betalt, linje forbliver altid
+        checkbox_value = st.checkbox(f"{label}", value=bool(paid), key=f"settlement_{settlement_id}")
+        if checkbox_value and not paid:
+            mark_settlement_paid(settlement_id)
+            paid = 1
+            status_text = "✅ Betalt"
+            status_color = "green"
 
-        # Vis linjen altid med opdateret status
         st.markdown(f"<span style='color:{status_color}; font-weight:bold'>{label} - {status_text}</span>", unsafe_allow_html=True)
 
 # --- Slet udgift ---
