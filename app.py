@@ -241,3 +241,39 @@ if st.button("NULSTIL APP"):
 
 
 st.subheader("COPYRIGHT 2025 - C.S.LOFT BIG MONEY PRODUCTIONS")
+
+
+
+# --- ADMIN: Vis database ---
+st.markdown("---")
+st.subheader("🔍 Admin: Se database")
+
+show_db = st.checkbox("Vis database (kun for administrator)")
+
+if show_db:
+    conn = sqlite3.connect("expenses.db")
+    c = conn.cursor()
+
+    st.markdown("### Udgifter")
+    c.execute("SELECT id, paid_by, amount, payers FROM expenses ORDER BY id DESC")
+    expenses_rows = c.fetchall()
+    if expenses_rows:
+        st.dataframe(expenses_rows, use_container_width=True)
+    else:
+        st.write("Ingen udgifter i databasen.")
+
+    st.markdown("### Afregninger")
+    c.execute("SELECT id, debtor, creditor, amount, paid FROM settlements ORDER BY id DESC")
+    settlements_rows = c.fetchall()
+    if settlements_rows:
+        # Farvede rækker: grøn = betalt, rød = ikke betalt
+        import pandas as pd
+        df = pd.DataFrame(settlements_rows, columns=["ID", "Debtor", "Creditor", "Amount", "Paid"])
+        def color_paid(val):
+            return 'background-color: lightgreen' if val == 1 else 'background-color: salmon'
+        st.dataframe(df.style.applymap(color_paid, subset=["Paid"]), use_container_width=True)
+    else:
+        st.write("Ingen afregninger i databasen.")
+
+    conn.close()
+
