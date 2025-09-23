@@ -194,7 +194,7 @@ if expenses:
 if 'show_settlements' not in st.session_state:
     st.session_state.show_settlements = False
 
-if expenses and st.button("Beregn afregning"):
+if expenses and st.button("Beregn udgifter (brug først til sidst)"):
     save_settlements(expenses)
     st.session_state.show_settlements = True
 
