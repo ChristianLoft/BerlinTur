@@ -224,6 +224,10 @@ if all_expenses:
 else:
     st.write("Ingen udgifter at slette endnu.")
 
+st.subheader("COPYRIGHT 2025 - C.S.LOFT BIG MONEY PRODUCTIONS")
+
+
+
 # --- RESET APP (kun administrator) ---
 st.markdown("---")
 st.subheader("⚠️ Administrator: Nulstil app")
@@ -239,8 +243,6 @@ if st.button("NULSTIL APP"):
     conn.close()
     st.success("Appen er nulstillet ✅ Alle udgifter og brugere er slettet.")
 
-
-st.subheader("COPYRIGHT 2025 - C.S.LOFT BIG MONEY PRODUCTIONS")
 
 
 
