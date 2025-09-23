@@ -28,7 +28,6 @@ def get_expenses():
     c.execute("SELECT user, amount FROM expenses")
     rows = c.fetchall()
     conn.close()
-
     expenses = {}
     for user, amount in rows:
         if user not in expenses:
@@ -55,7 +54,7 @@ def delete_expense(expense_id):
 def settle_expenses(expenses):
     if not expenses:
         return []
-    
+
     totals = {person: sum(beløb) for person, beløb in expenses.items()}
     total_amount = sum(totals.values())
     num_people = len(expenses)
@@ -70,37 +69,35 @@ def settle_expenses(expenses):
     while i < len(debtors) and j < len(creditors):
         debtor, debt = debtors[i]
         creditor, credit = creditors[j]
-
         amount = min(debt, credit)
         settlements.append(f"{debtor} skal betale {amount:.2f} kr. til {creditor}")
-
         debtors[i] = (debtor, debt - amount)
         creditors[j] = (creditor, credit - amount)
-
         if debtors[i][1] == 0:
             i += 1
         if creditors[j][1] == 0:
             j += 1
-
     return settlements
-
 
 # --- Streamlit App ---
 st.title("💶 Berlin Tur - Regnskabsapp")
-
 init_db()
 
-# --- Tilføj udgift ---
-st.subheader("Tilføj udgift")
+# --- Opret bruger automatisk og tilføj udgift ---
+st.subheader("Tilføj bruger og udgift")
 user = st.text_input("Navn")
 amount = st.number_input("Beløb (DKK)", min_value=0.0, step=0.01)
 
-if st.button("Gem udgift"):
-    if user and amount > 0:
+if user:
+    expenses = get_expenses()
+    if user not in expenses:
+        add_expense(user, 0.0)
+        st.info(f"{user} er oprettet med 0 kr.")
+
+    # Gem beløb automatisk, hvis > 0
+    if amount > 0:
         add_expense(user, amount)
         st.success(f"{user} har lagt ud med {amount:.2f} kr.")
-    else:
-        st.error("Indtast navn og et beløb > 0")
 
 # --- Oversigt ---
 expenses = get_expenses()
@@ -127,9 +124,8 @@ if all_expenses:
         "Vælg en udgift at slette",
         [f"ID {exp_id} | {u} har lagt ud med {amt:.2f} kr." for exp_id, u, amt in all_expenses]
     )
-
     if option:
-        exp_id = int(option.split()[1])  # træk ID ud af teksten
+        exp_id = int(option.split()[1])
         if st.button("Slet valgt udgift"):
             delete_expense(exp_id)
             st.success(f"Udgift {option} er slettet ✅")
