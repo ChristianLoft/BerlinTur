@@ -182,9 +182,15 @@ if expenses:
                 badges_html += f"<span style='background-color:{color}; color:black; padding:3px 6px; border-radius:5px; margin-right:3px;'>{payer}: {amt:.2f} kr.</span>"
             st.markdown(badges_html, unsafe_allow_html=True)
 
-# --- Beregn afregning med flueben, linjer bliver stående ---
+# --- Afregning med stabil visning ---
+if 'show_settlements' not in st.session_state:
+    st.session_state.show_settlements = False
+
 if expenses and st.button("Beregn afregning"):
     save_settlements(expenses)
+    st.session_state.show_settlements = True
+
+if st.session_state.show_settlements:
     st.subheader("Afregning")
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
@@ -194,18 +200,13 @@ if expenses and st.button("Beregn afregning"):
 
     for settlement_id, debtor, creditor, amount, paid in rows:
         label = f"{debtor} skal betale {amount:.2f} kr. til {creditor}"
-        status_text = "✅ Betalt" if paid else "❌ Ikke betalt"
-        status_color = "green" if paid else "red"
-
-        # Checkbox til at markere som betalt, linje forbliver altid
-        checkbox_value = st.checkbox(f"{label}", value=bool(paid), key=f"settlement_{settlement_id}")
+        checkbox_value = st.checkbox(label, value=bool(paid), key=f"settlement_{settlement_id}")
         if checkbox_value and not paid:
             mark_settlement_paid(settlement_id)
             paid = 1
-            status_text = "✅ Betalt"
-            status_color = "green"
 
-        st.markdown(f"<span style='color:{status_color}; font-weight:bold'>{label} - {status_text}</span>", unsafe_allow_html=True)
+        status_color = "green" if paid else "red"
+        st.markdown(f"<span style='color:{status_color}; font-weight:bold'>{label}</span>", unsafe_allow_html=True)
 
 # --- Slet udgift ---
 st.subheader("Slet en udgift")
