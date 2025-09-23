@@ -95,7 +95,7 @@ def get_color_from_name(name):
     return f"hsl({hue}, 70%, 70%)"
 
 # --- Streamlit App ---
-st.title("💶 Berlin Tur - Regnskabsapp")
+st.title("💶 BerlinTur - Regnskabsapp")
 init_db()
 
 # --- Opret bruger automatisk ---
