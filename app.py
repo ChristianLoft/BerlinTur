@@ -142,7 +142,7 @@ def get_color_from_name(name):
     return f"hsl({hue}, 70%, 70%)"
 
 # --- Streamlit App ---
-st.title("💶 Berlin Tur - Regnskabsapp")
+st.title("💶 Berlin Tur - ParcelsRegnskab")
 init_db()
 
 # --- Opret bruger ---
@@ -194,6 +194,7 @@ if expenses:
 if 'show_settlements' not in st.session_state:
     st.session_state.show_settlements = False
 
+st.markdown("---")
 if expenses and st.button("Beregn udgifter (brug først til sidst)"):
     save_settlements(expenses)
     st.session_state.show_settlements = True
