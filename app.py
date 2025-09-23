@@ -10,43 +10,39 @@ def init_db():
     c.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user TEXT,
-            amount REAL
+            paid_by TEXT,
+            amount REAL,
+            payers TEXT
         )
     """)
-    # Tilføj kolonnen 'payers', hvis den ikke findes
-    c.execute("PRAGMA table_info(expenses)")
-    columns = [info[1] for info in c.fetchall()]
-    if 'payers' not in columns:
-        c.execute("ALTER TABLE expenses ADD COLUMN payers TEXT")
     conn.commit()
     conn.close()
 
-def add_expense(user, amount, payers=None):
-    payers_str = ",".join(payers) if payers else user
+def add_expense(paid_by, amount, payers):
+    payers_str = ",".join(payers)
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
-    c.execute("INSERT INTO expenses (user, amount, payers) VALUES (?, ?, ?)", (user, amount, payers_str))
+    c.execute("INSERT INTO expenses (paid_by, amount, payers) VALUES (?, ?, ?)", (paid_by, amount, payers_str))
     conn.commit()
     conn.close()
 
 def get_expenses():
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
-    c.execute("SELECT user, amount, payers FROM expenses")
+    c.execute("SELECT paid_by, amount, payers FROM expenses")
     rows = c.fetchall()
     conn.close()
     expenses = {}
-    for user, amount, payers in rows:
-        if user not in expenses:
-            expenses[user] = []
-        expenses[user].append((amount, payers))
+    for paid_by, amount, payers in rows:
+        if paid_by not in expenses:
+            expenses[paid_by] = []
+        expenses[paid_by].append((amount, payers))
     return expenses
 
 def get_all_expenses():
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
-    c.execute("SELECT id, user, amount, payers FROM expenses ORDER BY id DESC")
+    c.execute("SELECT id, paid_by, amount, payers FROM expenses ORDER BY id DESC")
     rows = c.fetchall()
     conn.close()
     return rows
@@ -103,33 +99,34 @@ user = st.text_input("Navn", key="user_input")
 if user:
     expenses = get_expenses()
     if user not in expenses:
-        add_expense(user, 0.0)
+        add_expense(user, 0.0, [user])
         st.info(f"{user} er oprettet med 0 kr.")
 
-# --- Tilføj udgift med valgte deltagere ---
+# --- Tilføj udgift via form (undgår session_state fejl) ---
 st.subheader("Tilføj udgift")
 all_users = list(get_expenses().keys())
 if all_users:
-    payers = st.multiselect("Vælg hvem, der skal betale for udgiften", all_users)
-    amount = st.number_input("Beløb (DKK)", min_value=0.0, step=0.01, key="amount_input", value=0.0)
-    
-    if st.button("Tilføj udgift"):
-        if amount > 0 and payers:
-            split_amount = amount / len(payers)
-            for payer in payers:
-                add_expense(payer, split_amount, payers)
-            st.success(f"Udgift på {amount:.2f} kr. tilføjet og delt mellem: {', '.join(payers)}")
-            # Reset number_input korrekt
-            st.session_state['amount_input'] = 0.0
-        else:
-            st.error("Indtast et beløb > 0 og vælg mindst én person")
+    with st.form(key="expense_form"):
+        paid_by = st.selectbox("Hvem har lagt ud?", all_users)
+        amount = st.number_input("Beløb (DKK)", min_value=0.0, step=0.01, value=0.0)
+        payers = st.multiselect("Vælg hvem, der skal betale", all_users, default=[paid_by])
+        submitted = st.form_submit_button("Tilføj udgift")
+        if submitted:
+            if amount > 0 and payers:
+                split_amount = amount / len(payers)
+                for payer in payers:
+                    add_expense(paid_by, split_amount, payers)
+                st.success(f"Udgift på {amount:.2f} kr. lagt af {paid_by} og delt mellem: {', '.join(payers)}")
+            else:
+                st.error("Indtast beløb > 0 og vælg mindst én person")
 
-# --- Oversigt med farvede badges ---
+# --- Oversigt med badges ---
 expenses = get_expenses()
 if expenses:
     st.subheader("Aktuelle udgifter")
-    for u, vals in expenses.items():
-        st.write(f"**{u}**: {sum([amt for amt, _ in vals]):.2f} kr.")
+    for paid_by, vals in expenses.items():
+        total = sum([amt for amt, _ in vals])
+        st.write(f"**{paid_by} har lagt ud:** {total:.2f} kr.")
         for amt, payers_str in vals:
             payer_list = payers_str.split(",")
             badges_html = ""
@@ -154,7 +151,7 @@ all_expenses = get_all_expenses()
 if all_expenses:
     option = st.selectbox(
         "Vælg en udgift at slette",
-        [f"ID {exp_id} | {u} har lagt ud med {amt:.2f} kr. ({payers})" for exp_id, u, amt, payers in all_expenses]
+        [f"ID {exp_id} | {paid_by} har lagt ud med {amt:.2f} kr. ({payers})" for exp_id, paid_by, amt, payers in all_expenses]
     )
     if option:
         exp_id = int(option.split()[1])
