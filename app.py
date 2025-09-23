@@ -1,5 +1,6 @@
 import streamlit as st
 import sqlite3
+import hashlib
 
 # --- Database-funktioner ---
 def init_db():
@@ -9,36 +10,38 @@ def init_db():
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user TEXT,
-            amount REAL
+            amount REAL,
+            payers TEXT
         )
     """)
     conn.commit()
     conn.close()
 
-def add_expense(user, amount):
+def add_expense(user, amount, payers=None):
+    payers_str = ",".join(payers) if payers else user
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
-    c.execute("INSERT INTO expenses (user, amount) VALUES (?, ?)", (user, amount))
+    c.execute("INSERT INTO expenses (user, amount, payers) VALUES (?, ?, ?)", (user, amount, payers_str))
     conn.commit()
     conn.close()
 
 def get_expenses():
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
-    c.execute("SELECT user, amount FROM expenses")
+    c.execute("SELECT user, amount, payers FROM expenses")
     rows = c.fetchall()
     conn.close()
     expenses = {}
-    for user, amount in rows:
+    for user, amount, payers in rows:
         if user not in expenses:
             expenses[user] = []
-        expenses[user].append(amount)
+        expenses[user].append((amount, payers))
     return expenses
 
 def get_all_expenses():
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
-    c.execute("SELECT id, user, amount FROM expenses ORDER BY id DESC")
+    c.execute("SELECT id, user, amount, payers FROM expenses ORDER BY id DESC")
     rows = c.fetchall()
     conn.close()
     return rows
@@ -55,7 +58,7 @@ def settle_expenses(expenses):
     if not expenses:
         return []
 
-    totals = {person: sum(beløb) for person, beløb in expenses.items()}
+    totals = {person: sum([amt for amt, _ in vals]) for person, vals in expenses.items()}
     total_amount = sum(totals.values())
     num_people = len(expenses)
     fair_share = total_amount / num_people
@@ -79,32 +82,56 @@ def settle_expenses(expenses):
             j += 1
     return settlements
 
+# --- Funktion til at generere faste farver ud fra navn ---
+def get_color_from_name(name):
+    # Hash navnet for at få et tal
+    hash_int = int(hashlib.md5(name.encode()).hexdigest(), 16)
+    hue = hash_int % 360  # HSL hue mellem 0-359
+    return f"hsl({hue}, 70%, 70%)"
+
 # --- Streamlit App ---
 st.title("💶 Berlin Tur - Regnskabsapp")
 init_db()
 
-# --- Opret bruger automatisk og tilføj udgift ---
-st.subheader("Tilføj bruger og udgift")
-user = st.text_input("Navn")
-amount = st.number_input("Beløb (DKK)", min_value=0.0, step=0.01)
-
+# --- Opret bruger automatisk ---
+st.subheader("Tilføj bruger")
+user = st.text_input("Navn", key="user_input")
 if user:
     expenses = get_expenses()
     if user not in expenses:
         add_expense(user, 0.0)
         st.info(f"{user} er oprettet med 0 kr.")
 
-    # Gem beløb automatisk, hvis > 0
-    if amount > 0:
-        add_expense(user, amount)
-        st.success(f"{user} har lagt ud med {amount:.2f} kr.")
+# --- Tilføj udgift med valgte deltagere ---
+st.subheader("Tilføj udgift")
+all_users = list(get_expenses().keys())
+if all_users:
+    payers = st.multiselect("Vælg hvem, der skal betale for udgiften", all_users)
+    amount = st.number_input("Beløb (DKK)", min_value=0.0, step=0.01, key="amount_input")
+    
+    if st.button("Tilføj udgift"):
+        if amount > 0 and payers:
+            split_amount = amount / len(payers)
+            for payer in payers:
+                add_expense(payer, split_amount, payers)
+            st.success(f"Udgift på {amount:.2f} kr. tilføjet og delt mellem: {', '.join(payers)}")
+            st.session_state.amount_input = 0.0
+        else:
+            st.error("Indtast et beløb > 0 og vælg mindst én person")
 
-# --- Oversigt ---
+# --- Oversigt med farvede badges ---
 expenses = get_expenses()
 if expenses:
     st.subheader("Aktuelle udgifter")
-    for u, amounts in expenses.items():
-        st.write(f"**{u}**: {sum(amounts):.2f} kr. (udlæg: {amounts})")
+    for u, vals in expenses.items():
+        st.write(f"**{u}**: {sum([amt for amt, _ in vals]):.2f} kr.")
+        for amt, payers_str in vals:
+            payer_list = payers_str.split(",")
+            badges_html = ""
+            for payer in payer_list:
+                color = get_color_from_name(payer)
+                badges_html += f"<span style='background-color:{color}; color:black; padding:3px 6px; border-radius:5px; margin-right:3px;'>{payer}: {amt:.2f} kr.</span>"
+            st.markdown(badges_html, unsafe_allow_html=True)
 
 # --- Beregn afregning ---
 if expenses and st.button("Beregn afregning"):
@@ -122,7 +149,7 @@ all_expenses = get_all_expenses()
 if all_expenses:
     option = st.selectbox(
         "Vælg en udgift at slette",
-        [f"ID {exp_id} | {u} har lagt ud med {amt:.2f} kr." for exp_id, u, amt in all_expenses]
+        [f"ID {exp_id} | {u} har lagt ud med {amt:.2f} kr. ({payers})" for exp_id, u, amt, payers in all_expenses]
     )
     if option:
         exp_id = int(option.split()[1])
