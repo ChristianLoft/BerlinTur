@@ -223,14 +223,14 @@ if all_expenses:
             st.success(f"Udgift {option} er slettet ✅")
 else:
     st.write("Ingen udgifter at slette endnu.")
-
+st.markdown("---")
 st.subheader("COPYRIGHT 2025 - C.S.LOFT BIG MONEY PRODUCTIONS")
 
 
 
 # --- RESET APP (kun administrator) ---
 st.markdown("---")
-st.subheader("⚠️ Administrator: Nulstil app")
+st.subheader("⚠️ Administrator: Nulstil app - nix pille")
 st.markdown(
     "Denne funktion sletter **alle udgifter og brugere**. Brug kun hvis du er administrator!"
 )
