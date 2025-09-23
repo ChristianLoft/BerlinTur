@@ -238,3 +238,6 @@ if st.button("NULSTIL APP"):
     conn.commit()
     conn.close()
     st.success("Appen er nulstillet ✅ Alle udgifter og brugere er slettet.")
+
+
+st.subheader("COPYRIGHT 2025 - C.S.LOFT BIG MONEY PRODUCTIONS")
