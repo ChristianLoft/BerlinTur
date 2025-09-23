@@ -6,15 +6,32 @@ import hashlib
 def init_db():
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
+
     # Opret tabel, hvis den ikke findes
     c.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            paid_by TEXT,
-            amount REAL,
-            payers TEXT
+            user TEXT,
+            amount REAL
         )
     """)
+
+    # Tjek kolonner
+    c.execute("PRAGMA table_info(expenses)")
+    columns = [info[1] for info in c.fetchall()]
+
+    # Tilføj kolonnen 'paid_by', hvis den ikke findes
+    if 'paid_by' not in columns:
+        c.execute("ALTER TABLE expenses ADD COLUMN paid_by TEXT")
+        # Sæt 'paid_by' = 'user' for eksisterende rækker
+        c.execute("UPDATE expenses SET paid_by = user")
+
+    # Tilføj kolonnen 'payers', hvis den ikke findes
+    if 'payers' not in columns:
+        c.execute("ALTER TABLE expenses ADD COLUMN payers TEXT")
+        # Sæt 'payers' = user for eksisterende rækker
+        c.execute("UPDATE expenses SET payers = user")
+
     conn.commit()
     conn.close()
 
@@ -102,7 +119,7 @@ if user:
         add_expense(user, 0.0, [user])
         st.info(f"{user} er oprettet med 0 kr.")
 
-# --- Tilføj udgift via form (undgår session_state fejl) ---
+# --- Tilføj udgift via form ---
 st.subheader("Tilføj udgift")
 all_users = list(get_expenses().keys())
 if all_users:
