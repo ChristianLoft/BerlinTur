@@ -182,7 +182,7 @@ if expenses:
                 badges_html += f"<span style='background-color:{color}; color:black; padding:3px 6px; border-radius:5px; margin-right:3px;'>{payer}: {amt:.2f} kr.</span>"
             st.markdown(badges_html, unsafe_allow_html=True)
 
-# --- Beregn afregning ---
+# --- Beregn afregning med flueben, linjer bliver stående ---
 if expenses and st.button("Beregn afregning"):
     save_settlements(expenses)
     st.subheader("Afregning")
@@ -194,12 +194,19 @@ if expenses and st.button("Beregn afregning"):
 
     for settlement_id, debtor, creditor, amount, paid in rows:
         label = f"{debtor} skal betale {amount:.2f} kr. til {creditor}"
-        if paid:
-            st.markdown(f"✅ {label}")
-        else:
+        status_text = "✅ Betalt" if paid else "❌ Ikke betalt"
+        status_color = "green" if paid else "red"
+
+        # Checkbox for at markere som betalt
+        if not paid:
             if st.checkbox(f"Betalt? {label}", key=f"settlement_{settlement_id}"):
                 mark_settlement_paid(settlement_id)
-                st.success(f"Betalingen er markeret som gennemført ✅")
+                paid = 1
+                status_text = "✅ Betalt"
+                status_color = "green"
+
+        # Vis linjen altid med opdateret status
+        st.markdown(f"<span style='color:{status_color}; font-weight:bold'>{label} - {status_text}</span>", unsafe_allow_html=True)
 
 # --- Slet udgift ---
 st.subheader("Slet en udgift")
@@ -231,7 +238,3 @@ if st.button("NULSTIL APP"):
     conn.commit()
     conn.close()
     st.success("Appen er nulstillet ✅ Alle udgifter og brugere er slettet.")
-
-
-
-st.subheader("COPYRIGHT CHRISTIAN LOFT CONSULTANCY AND BIG MONEY")
