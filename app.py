@@ -89,13 +89,12 @@ def settle_expenses(expenses):
 
 # --- Funktion til at generere faste farver ud fra navn ---
 def get_color_from_name(name):
-    # Hash navnet for at få et tal
     hash_int = int(hashlib.md5(name.encode()).hexdigest(), 16)
-    hue = hash_int % 360  # HSL hue mellem 0-359
+    hue = hash_int % 360
     return f"hsl({hue}, 70%, 70%)"
 
 # --- Streamlit App ---
-st.title("💶 BerlinTur - Regnskabsapp")
+st.title("💶 Berlin Tur - Regnskabsapp")
 init_db()
 
 # --- Opret bruger automatisk ---
@@ -112,7 +111,7 @@ st.subheader("Tilføj udgift")
 all_users = list(get_expenses().keys())
 if all_users:
     payers = st.multiselect("Vælg hvem, der skal betale for udgiften", all_users)
-    amount = st.number_input("Beløb (DKK)", min_value=0.0, step=0.01, key="amount_input")
+    amount = st.number_input("Beløb (DKK)", min_value=0.0, step=0.01, key="amount_input", value=0.0)
     
     if st.button("Tilføj udgift"):
         if amount > 0 and payers:
@@ -120,7 +119,8 @@ if all_users:
             for payer in payers:
                 add_expense(payer, split_amount, payers)
             st.success(f"Udgift på {amount:.2f} kr. tilføjet og delt mellem: {', '.join(payers)}")
-            st.session_state.amount_input = 0.0
+            # Reset number_input korrekt
+            st.session_state['amount_input'] = 0.0
         else:
             st.error("Indtast et beløb > 0 og vælg mindst én person")
 
